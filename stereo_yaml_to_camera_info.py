@@ -20,22 +20,35 @@ def scale_intrinsics(camera_matrix, original_size, new_size):
 def determine_cameras(data):
     cam_0_pose = np.array(data['camera_0']['camera_pose_matrix']['data']).reshape(4, 4)
     cam_1_pose = np.array(data['camera_1']['camera_pose_matrix']['data']).reshape(4, 4)
-    
+
     if cam_1_pose[0, 3] > cam_0_pose[0, 3]:
         left_camera, right_camera = 'camera_0', 'camera_1'
     else:
         left_camera, right_camera = 'camera_1', 'camera_0'
-    
+
     return left_camera, right_camera
 
-def calculate_right_projection_matrix(right_intrinsic, right_pose):
-    rotation = right_pose[:3, :3]
-    translation = right_pose[:3, 3].reshape(-1, 1)
-    projection_matrix = np.dot(right_intrinsic, np.hstack((rotation, translation)))
+def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):
+    if scale == 'm':
+        scale_factor = 1
+    elif scale == 'cm':
+        scale_factor = 0.01
+    else:
+        raise Exception("Type should be [m] or [cm].")
+    # Extract rotation and translation
+    rotation_from_left_to_right = right_pose[:3, :3].T  # Transpose for inverse rotation
+    translation_from_left_to_right = np.matmul(-rotation_from_left_to_right, right_pose[:3, 3] * scale_factor)
+
+    Rt = np.hstack((rotation_from_left_to_right, translation_from_left_to_right.reshape(-1, 1)))
+
+    projection_matrix = np.matmul(right_intrinsic, Rt)
+
+
     return projection_matrix
 
-def save_camera_info_yaml(file_path, image_width, image_height, camera_matrix, distortion_coeffs, projection_matrix):
+def save_camera_info_yaml(file_path, camera_name, image_width, image_height, camera_matrix, distortion_coeffs, projection_matrix):
     camera_info = {
+        "camera_name": camera_name,
         "image_width": image_width,
         "image_height": image_height,
         "camera_matrix": {
@@ -46,7 +59,7 @@ def save_camera_info_yaml(file_path, image_width, image_height, camera_matrix, d
         "distortion_model": "plumb_bob",
         "distortion_coefficients": {
             "rows": 1,
-            "cols": 5,
+            "cols": len(distortion_coeffs),
             "data": distortion_coeffs.flatten().tolist()
         },
         "rectification_matrix": {
@@ -60,43 +73,45 @@ def save_camera_info_yaml(file_path, image_width, image_height, camera_matrix, d
             "data": projection_matrix.flatten().tolist()
         }
     }
-    
+
+    # YAML 저장
     with open(file_path, 'w') as file:
-        yaml.dump(camera_info, file)
+        file.write("#%YAML:1.0\n")  # YAML 버전 표기
+        yaml.dump(camera_info, file, default_flow_style=None, sort_keys=False)
 
 def main():
     file_path = 'calib_result.yaml'
     data = read_yaml(file_path)
-    
-    # Determine which is left and right camera
+
+    # 둘 중 어느 카메라가 왼쪽, 오른쪽인지 결정
     left_camera, right_camera = determine_cameras(data)
-    
-    # Original and new image sizes
+
+    # image size 결정
     original_size = (data[left_camera]['img_width'], data[left_camera]['img_height'])
     new_size = (640, 480)
-    
-    # Load intrinsic matrices
+
+    # intrinsic parameter 로드
     left_intrinsic = np.array(data[left_camera]['camera_matrix']['data']).reshape(3, 3)
     right_intrinsic = np.array(data[right_camera]['camera_matrix']['data']).reshape(3, 3)
-    
-    # Load distortion coefficients
+
+    # distortion parameter 로드
     left_distortion = np.array(data[left_camera]['distortion_vector']['data'])
     right_distortion = np.array(data[right_camera]['distortion_vector']['data'])
-    
-    # Scale intrinsic matrices
+
+    # scale intrinsic parameter 계산
     left_intrinsic_scaled = scale_intrinsics(left_intrinsic, original_size, new_size)
     right_intrinsic_scaled = scale_intrinsics(right_intrinsic, original_size, new_size)
-    
-    # Create left camera projection matrix (3x4) by extending 3x3 intrinsic matrix
+
+    # left camrea projection matrix
     left_projection_matrix = np.hstack((left_intrinsic_scaled, np.zeros((3, 1))))
-    
-    # Calculate right camera projection matrix
+
+    # right camera projection matrix
     right_pose_matrix = np.array(data[right_camera]['camera_pose_matrix']['data']).reshape(4, 4)
-    
-    # Save to left.yaml and right.yaml
-    save_camera_info_yaml("left.yaml", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, left_projection_matrix)
-    save_camera_info_yaml("right.yaml", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, right_projection_matrix)
+    right_projection_matrix = calculate_right_projection_matrix(right_intrinsic_scaled, right_pose_matrix, 'cm')
+
+    # ros camera_info에 맞게 yaml 파일로 저장
+    save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, left_projection_matrix)
+    save_camera_info_yaml("right.yaml", "flir_right", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, right_projection_matrix)
 
 if __name__ == '__main__':
     main()
-
