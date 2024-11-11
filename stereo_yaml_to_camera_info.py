@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import yaml
+import Quaternion as Q
 
 def read_yaml(file_path):
     with open(file_path, 'r') as file:
@@ -36,10 +37,10 @@ def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):
     else:
         raise Exception("Type should be [m] or [cm].")
     # Extract rotation and translation
-    rotation_from_left_to_right = right_pose[:3, :3].T  # Transpose for inverse rotation
-    translation_from_left_to_right = np.matmul(-rotation_from_left_to_right, right_pose[:3, 3] * scale_factor)
+    rotation_from_right_to_left = right_pose[:3, :3].T  # Transpose for inverse rotation
+    translation_from_right_to_left = np.matmul(-rotation_from_right_to_left, right_pose[:3, 3] * scale_factor)
 
-    Rt = np.hstack((rotation_from_left_to_right, translation_from_left_to_right.reshape(-1, 1)))
+    Rt = np.hstack((rotation_from_right_to_left, translation_from_right_to_left.reshape(-1, 1)))
 
     projection_matrix = np.matmul(right_intrinsic, Rt)
 
@@ -79,6 +80,13 @@ def save_camera_info_yaml(file_path, camera_name, image_width, image_height, cam
         file.write("#%YAML:1.0\n")  # YAML 버전 표기
         yaml.dump(camera_info, file, default_flow_style=None, sort_keys=False)
 
+def print_left_to_right_tf(right_pose):
+    translation = right_pose[:3, 3]
+    rotation = right_pose[:3, :3]
+    q = Q.rotation_matrix_to_quaternion(rotation)
+    print("tf: tx ty tz q1 q2 q3 q0") 
+    print(f"{translation[0]}, {translation[1]}, {translation[2]}, {q[1]}, {q[1]}, {q[3]}, {q[0]}")
+
 def main():
     file_path = 'calib_result.yaml'
     data = read_yaml(file_path)
@@ -112,6 +120,8 @@ def main():
     # ros camera_info에 맞게 yaml 파일로 저장
     save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, left_projection_matrix)
     save_camera_info_yaml("right.yaml", "flir_right", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, right_projection_matrix)
+    
+    print_left_to_right_tf(right_pose_matrix)
 
 if __name__ == '__main__':
     main()
