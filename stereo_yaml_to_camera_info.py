@@ -1,4 +1,4 @@
-import cv2
+import math
 import numpy as np
 import yaml
 import Quaternion as Q
@@ -29,7 +29,7 @@ def determine_cameras(data):
 
     return left_camera, right_camera
 
-def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):
+def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):  # right_pose: 4x4
     if scale == 'm':
         scale_factor = 1
     elif scale == 'cm':
@@ -44,8 +44,7 @@ def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):
 
     projection_matrix = np.matmul(right_intrinsic, Rt)
 
-
-    return projection_matrix
+    return projection_matrix # 3x4
 
 def save_camera_info_yaml(file_path, camera_name, image_width, image_height, camera_matrix, distortion_coeffs, projection_matrix):
     camera_info = {
@@ -80,12 +79,26 @@ def save_camera_info_yaml(file_path, camera_name, image_width, image_height, cam
         file.write("#%YAML:1.0\n")  # YAML 버전 표기
         yaml.dump(camera_info, file, default_flow_style=None, sort_keys=False)
 
-def print_left_to_right_tf(right_pose):
+def print_left_to_right_tf(right_pose): # right_pose: 4x4
     translation = right_pose[:3, 3]
     rotation = right_pose[:3, :3]
     q = Q.rotation_matrix_to_quaternion(rotation)
-    print("tf: tx ty tz q1 q2 q3 q0") 
+    print("tf: tx ty tz q1 q2 q3 q0")
     print(f"{translation[0]}, {translation[1]}, {translation[2]}, {q[1]}, {q[1]}, {q[3]}, {q[0]}")
+
+def apply_tilt_to_pose_matrix(pose_matrix, tilt_angle_deg): # pose_matrix: 4x4
+    tilt_angle_rad = math.radians(tilt_angle_deg)
+
+    tilt_rotation = np.array([
+        [1, 0, 0],
+        [0, np.cos(tilt_angle_rad), -np.sin(tilt_angle_rad)],
+        [0, np.sin(tilt_angle_rad), np.cos(tilt_angle_rad)]
+    ])
+
+    tiltted_pose_matrix = pose_matrix.copy()
+    tiltted_pose_matrix[:3, :3] = np.dot(tilt_rotation, pose_matrix[:3, :3])
+
+    return tiltted_pose_matrix # 4x4
 
 def main():
     file_path = 'calib_result.yaml'
@@ -110,17 +123,21 @@ def main():
     left_intrinsic_scaled = scale_intrinsics(left_intrinsic, original_size, new_size)
     right_intrinsic_scaled = scale_intrinsics(right_intrinsic, original_size, new_size)
 
+    tilt_angle_deg = 0
     # left camrea projection matrix
-    left_projection_matrix = np.hstack((left_intrinsic_scaled, np.zeros((3, 1))))
+    left_pose_matrix = np.array(data[left_camera]['camera_pose_matrix']['data']).reshape(4, 4)
+    tiltied_left_pose_matrix = apply_tilt_to_pose_matrix(left_pose_matrix, tilt_angle_deg)
+    left_projection_matrix = np.dot(left_intrinsic_scaled, tiltied_left_pose_matrix[:3, :])
 
     # right camera projection matrix
     right_pose_matrix = np.array(data[right_camera]['camera_pose_matrix']['data']).reshape(4, 4)
-    right_projection_matrix = calculate_right_projection_matrix(right_intrinsic_scaled, right_pose_matrix, 'cm')
+    tiltied_right_pose_matrix = apply_tilt_to_pose_matrix(right_pose_matrix, tilt_angle_deg)
+    right_projection_matrix = calculate_right_projection_matrix(right_intrinsic_scaled, tiltied_right_pose_matrix, 'cm')
 
     # ros camera_info에 맞게 yaml 파일로 저장
     save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, left_projection_matrix)
     save_camera_info_yaml("right.yaml", "flir_right", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, right_projection_matrix)
-    
+
     print_left_to_right_tf(right_pose_matrix)
 
 if __name__ == '__main__':
