@@ -29,7 +29,18 @@ def determine_cameras(data):
 
     return left_camera, right_camera
 
-def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):  # right_pose: 4x4
+def calculate_projection_matrix(intrinsic, pose_matrix, scale="m"):
+    """Calculate projection matrix from camera to world frame. If camera tilting is 0, world frame is same with left camera frame
+    
+    Parameters
+    ----------
+    intrinsic : [3x3] np.ndarray
+    pose_matrix: [4x4] np.ndarray
+    
+    Returns
+    -------
+    projection_matrix : [3x4] np.ndarray
+    """
     if scale == 'm':
         scale_factor = 1
     elif scale == 'cm':
@@ -37,12 +48,12 @@ def calculate_right_projection_matrix(right_intrinsic, right_pose, scale="m"):  
     else:
         raise Exception("Type should be [m] or [cm].")
     # Extract rotation and translation
-    rotation_from_right_to_left = right_pose[:3, :3].T  # Transpose for inverse rotation
-    translation_from_right_to_left = np.matmul(-rotation_from_right_to_left, right_pose[:3, 3] * scale_factor)
+    rotation_from_c_to_w = pose_matrix[:3, :3].T  # Transpose for inverse rotation
+    translation_from_c_to_w = np.matmul(-rotation_from_c_to_w, pose_matrix[:3, 3] * scale_factor)
 
-    Rt = np.hstack((rotation_from_right_to_left, translation_from_right_to_left.reshape(-1, 1)))
+    Rt = np.hstack((rotation_from_c_to_w, translation_from_c_to_w.reshape(-1, 1)))
 
-    projection_matrix = np.matmul(right_intrinsic, Rt)
+    projection_matrix = np.matmul(intrinsic, Rt)
 
     return projection_matrix # 3x4
 
@@ -90,13 +101,14 @@ def apply_tilt_to_pose_matrix(pose_matrix, tilt_angle_deg): # pose_matrix: 4x4
     tilt_angle_rad = math.radians(tilt_angle_deg)
 
     tilt_rotation = np.array([
-        [1, 0, 0],
-        [0, np.cos(tilt_angle_rad), -np.sin(tilt_angle_rad)],
-        [0, np.sin(tilt_angle_rad), np.cos(tilt_angle_rad)]
+        [1, 0, 0, 0],
+        [0, np.cos(tilt_angle_rad), -np.sin(tilt_angle_rad), 0],
+        [0, np.sin(tilt_angle_rad), np.cos(tilt_angle_rad), 0],
+        [0, 0, 0, 1]
     ])
 
     tiltted_pose_matrix = pose_matrix.copy()
-    tiltted_pose_matrix[:3, :3] = np.dot(tilt_rotation, pose_matrix[:3, :3])
+    tiltted_pose_matrix = np.dot(tilt_rotation, pose_matrix)
 
     return tiltted_pose_matrix # 4x4
 
@@ -123,16 +135,16 @@ def main():
     left_intrinsic_scaled = scale_intrinsics(left_intrinsic, original_size, new_size)
     right_intrinsic_scaled = scale_intrinsics(right_intrinsic, original_size, new_size)
 
-    tilt_angle_deg = 0
+    tilt_angle_deg = 10
     # left camrea projection matrix
     left_pose_matrix = np.array(data[left_camera]['camera_pose_matrix']['data']).reshape(4, 4)
     tiltied_left_pose_matrix = apply_tilt_to_pose_matrix(left_pose_matrix, tilt_angle_deg)
-    left_projection_matrix = np.dot(left_intrinsic_scaled, tiltied_left_pose_matrix[:3, :])
+    left_projection_matrix = calculate_projection_matrix(left_intrinsic_scaled, tiltied_left_pose_matrix, 'cm')
 
     # right camera projection matrix
     right_pose_matrix = np.array(data[right_camera]['camera_pose_matrix']['data']).reshape(4, 4)
-    tiltied_right_pose_matrix = apply_tilt_to_pose_matrix(right_pose_matrix, tilt_angle_deg)
-    right_projection_matrix = calculate_right_projection_matrix(right_intrinsic_scaled, tiltied_right_pose_matrix, 'cm')
+    tilted_right_pose_matrix = apply_tilt_to_pose_matrix(right_pose_matrix, tilt_angle_deg)
+    right_projection_matrix = calculate_projection_matrix(right_intrinsic_scaled, tilted_right_pose_matrix, 'cm')
 
     # ros camera_info에 맞게 yaml 파일로 저장
     save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, left_projection_matrix)
