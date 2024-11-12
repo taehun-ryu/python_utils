@@ -2,6 +2,7 @@ import math
 import numpy as np
 import yaml
 import Quaternion as Q
+import cv2
 
 def read_yaml(file_path):
     with open(file_path, 'r') as file:
@@ -29,35 +30,7 @@ def determine_cameras(data):
 
     return left_camera, right_camera
 
-def calculate_projection_matrix(intrinsic, pose_matrix, scale="m"):
-    """Calculate projection matrix from camera to world frame. If camera tilting is 0, world frame is same with left camera frame
-    
-    Parameters
-    ----------
-    intrinsic : [3x3] np.ndarray
-    pose_matrix: [4x4] np.ndarray
-    
-    Returns
-    -------
-    projection_matrix : [3x4] np.ndarray
-    """
-    if scale == 'm':
-        scale_factor = 1
-    elif scale == 'cm':
-        scale_factor = 0.01
-    else:
-        raise Exception("Type should be [m] or [cm].")
-    # Extract rotation and translation
-    rotation_from_c_to_w = pose_matrix[:3, :3].T  # Transpose for inverse rotation
-    translation_from_c_to_w = np.matmul(-rotation_from_c_to_w, pose_matrix[:3, 3] * scale_factor)
-
-    Rt = np.hstack((rotation_from_c_to_w, translation_from_c_to_w.reshape(-1, 1)))
-
-    projection_matrix = np.matmul(intrinsic, Rt)
-
-    return projection_matrix # 3x4
-
-def save_camera_info_yaml(file_path, camera_name, image_width, image_height, camera_matrix, distortion_coeffs, projection_matrix):
+def save_camera_info_yaml(file_path, camera_name, image_width, image_height, camera_matrix, distortion_coeffs, rectification_matrix, projection_matrix):
     camera_info = {
         "camera_name": camera_name,
         "image_width": image_width,
@@ -76,7 +49,7 @@ def save_camera_info_yaml(file_path, camera_name, image_width, image_height, cam
         "rectification_matrix": {
             "rows": 3,
             "cols": 3,
-            "data": np.eye(3).flatten().tolist()  # Identity matrix for rectification
+            "data": rectification_matrix.flatten().tolist()
         },
         "projection_matrix": {
             "rows": 3,
@@ -97,20 +70,33 @@ def print_left_to_right_tf(right_pose): # right_pose: 4x4
     print("tf: tx ty tz q1 q2 q3 q0")
     print(f"{translation[0]}, {translation[1]}, {translation[2]}, {q[1]}, {q[1]}, {q[3]}, {q[0]}")
 
-def apply_tilt_to_pose_matrix(pose_matrix, tilt_angle_deg): # pose_matrix: 4x4
-    tilt_angle_rad = math.radians(tilt_angle_deg)
-
-    tilt_rotation = np.array([
-        [1, 0, 0, 0],
-        [0, np.cos(tilt_angle_rad), -np.sin(tilt_angle_rad), 0],
-        [0, np.sin(tilt_angle_rad), np.cos(tilt_angle_rad), 0],
-        [0, 0, 0, 1]
-    ])
-
-    tiltted_pose_matrix = pose_matrix.copy()
-    tiltted_pose_matrix = np.dot(tilt_rotation, pose_matrix)
-
-    return tiltted_pose_matrix # 4x4
+def calculate_rectification_matrices(left_intrinsic, left_distortion, right_intrinsic, right_distortion, 
+                                     rotation, translation, image_size):
+    """
+    Calculate rectification matrices for stereo cameras.
+    
+    Parameters:
+        left_intrinsic (np.array): Intrinsic matrix of the left camera.
+        left_distortion (np.array): Distortion coefficients of the left camera.
+        right_intrinsic (np.array): Intrinsic matrix of the right camera.
+        right_distortion (np.array): Distortion coefficients of the right camera.
+        rotation (np.array): Rotation matrix from left to right camera.
+        translation (np.array): Translation vector from left to right camera.
+        image_size (tuple): Image size as (width, height).
+        
+    Returns:
+        R1, R2: Rectification matrices for the left and right cameras.
+        P1, P2: Projection matrices after rectification for the left and right cameras.
+        Q: Disparity-to-depth mapping matrix.
+    """
+    # Compute rectification transforms
+    R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(
+        left_intrinsic, left_distortion,
+        right_intrinsic, right_distortion,
+        image_size, rotation, translation,
+        flags=cv2.CALIB_ZERO_DISPARITY, alpha=0
+    )
+    return R1, R2, P1, P2, Q
 
 def main():
     file_path = 'calib_result.yaml'
@@ -119,38 +105,42 @@ def main():
     # 둘 중 어느 카메라가 왼쪽, 오른쪽인지 결정
     left_camera, right_camera = determine_cameras(data)
 
-    # image size 결정
+    # image size 
     original_size = (data[left_camera]['img_width'], data[left_camera]['img_height'])
     new_size = (640, 480)
 
-    # intrinsic parameter 로드
+    # intrinsic parameter
     left_intrinsic = np.array(data[left_camera]['camera_matrix']['data']).reshape(3, 3)
     right_intrinsic = np.array(data[right_camera]['camera_matrix']['data']).reshape(3, 3)
 
-    # distortion parameter 로드
+    # distortion parameter
     left_distortion = np.array(data[left_camera]['distortion_vector']['data'])
     right_distortion = np.array(data[right_camera]['distortion_vector']['data'])
 
-    # scale intrinsic parameter 계산
+    # scale intrinsic parameter 
     left_intrinsic_scaled = scale_intrinsics(left_intrinsic, original_size, new_size)
     right_intrinsic_scaled = scale_intrinsics(right_intrinsic, original_size, new_size)
 
-    tilt_angle_deg = 10
-    # left camrea projection matrix
-    left_pose_matrix = np.array(data[left_camera]['camera_pose_matrix']['data']).reshape(4, 4)
-    tiltied_left_pose_matrix = apply_tilt_to_pose_matrix(left_pose_matrix, tilt_angle_deg)
-    left_projection_matrix = calculate_projection_matrix(left_intrinsic_scaled, tiltied_left_pose_matrix, 'cm')
+    # right camera’s pose in the left camera’s frame
+    camera_pose_matrix = np.array(data[right_camera]['camera_pose_matrix']['data']).reshape(4, 4)
+    
+    # from the coordinate system of the first camera to the second camera
+    camera_rotation = camera_pose_matrix[:3, :3].T
+    camera_translation = np.matmul(-camera_rotation, camera_pose_matrix[:3, 3] * 0.01)
 
-    # right camera projection matrix
-    right_pose_matrix = np.array(data[right_camera]['camera_pose_matrix']['data']).reshape(4, 4)
-    tilted_right_pose_matrix = apply_tilt_to_pose_matrix(right_pose_matrix, tilt_angle_deg)
-    right_projection_matrix = calculate_projection_matrix(right_intrinsic_scaled, tilted_right_pose_matrix, 'cm')
-
+    # Calculate rectification matrices
+    R1, R2, P1, P2, Q = calculate_rectification_matrices(
+        left_intrinsic_scaled, left_distortion,
+        right_intrinsic_scaled, right_distortion,
+        camera_rotation, camera_translation,
+        new_size
+    )
+    
     # ros camera_info에 맞게 yaml 파일로 저장
-    save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, left_projection_matrix)
-    save_camera_info_yaml("right.yaml", "flir_right", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, right_projection_matrix)
+    save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, R1, P1)
+    save_camera_info_yaml("right.yaml", "flir_right", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, R2, P2)
 
-    print_left_to_right_tf(right_pose_matrix)
+    print_left_to_right_tf(camera_pose_matrix)
 
 if __name__ == '__main__':
     main()
