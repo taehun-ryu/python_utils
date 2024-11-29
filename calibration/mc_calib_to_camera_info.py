@@ -51,8 +51,8 @@ def main():
     )
 
     # ros camera_info에 맞게 yaml 파일로 저장
-    save_camera_info_yaml("left.yaml", "flir_left", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, R1, P1)
-    save_camera_info_yaml("right.yaml", "flir_right", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, R2, P2)
+    save_camera_info_yaml("left.yaml", "left_camera", new_size[0], new_size[1], left_intrinsic_scaled, left_distortion, R1, P1)
+    save_camera_info_yaml("right.yaml", "right_camera", new_size[0], new_size[1], right_intrinsic_scaled, right_distortion, R2, P2)
 
     print_left_to_right_tf(camera_pose_matrix)
 

@@ -63,6 +63,11 @@ def print_left_to_right_tf(right_pose): # right_pose: 4x4
     print("tf: tx ty tz q1 q2 q3 q0")
     print(f"{translation[0]}, {translation[1]}, {translation[2]}, {q[1]}, {q[1]}, {q[3]}, {q[0]}")
 
+def print_left_to_right_tf(R, t):
+    q = Q.rotation_matrix_to_quaternion(R)
+    print("tf: tx ty tz q1 q2 q3 q0")
+    print(f"{t[0]}, {t[1]}, {t[2]}, {q[1]}, {q[1]}, {q[3]}, {q[0]}")
+
 def calculate_rectification_matrices(left_intrinsic, left_distortion, right_intrinsic, right_distortion, 
                                      rotation, translation, image_size):
     """
