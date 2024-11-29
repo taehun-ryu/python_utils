@@ -23,17 +23,6 @@ def scale_intrinsics(camera_matrix, original_size, new_size):
     scaled_matrix[1, 2] *= scale_y  # cy
     return scaled_matrix
 
-def determine_cameras(data):
-    cam_0_pose = np.array(data['camera_0']['camera_pose_matrix']['data']).reshape(4, 4)
-    cam_1_pose = np.array(data['camera_1']['camera_pose_matrix']['data']).reshape(4, 4)
-
-    if cam_1_pose[0, 3] > cam_0_pose[0, 3]:
-        left_camera, right_camera = 'camera_0', 'camera_1'
-    else:
-        left_camera, right_camera = 'camera_1', 'camera_0'
-
-    return left_camera, right_camera
-
 def save_camera_info_yaml(file_path, camera_name, image_width, image_height, camera_matrix, distortion_coeffs, rectification_matrix, projection_matrix):
     camera_info = {
         "camera_name": camera_name,

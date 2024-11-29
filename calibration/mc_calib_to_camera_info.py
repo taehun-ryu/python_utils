@@ -1,7 +1,16 @@
 import numpy as np
-import yaml
-import cv2
 from CalibrationYAML import *
+
+def determine_cameras(data):
+    cam_0_pose = np.array(data['camera_0']['camera_pose_matrix']['data']).reshape(4, 4)
+    cam_1_pose = np.array(data['camera_1']['camera_pose_matrix']['data']).reshape(4, 4)
+
+    if cam_1_pose[0, 3] > cam_0_pose[0, 3]:
+        left_camera, right_camera = 'camera_0', 'camera_1'
+    else:
+        left_camera, right_camera = 'camera_1', 'camera_0'
+
+    return left_camera, right_camera
 
 def main():
     file_path = 'calib_result.yaml'
