@@ -5,7 +5,7 @@ from rosbag2_py._storage import StorageOptions, ConverterOptions, TopicMetadata
 import importlib
 import sys
 
-def align_exact_timestamps(input_bag_path, output_bag_path, topic1, topic2):
+def align_to_reference_topic(input_bag_path, output_bag_path, reference_topic, target_topic):
     rclpy.init()
     node = rclpy.create_node('bag_modifier')
 
@@ -28,39 +28,42 @@ def align_exact_timestamps(input_bag_path, output_bag_path, topic1, topic2):
         writer.create_topic(topic_metadata)
 
     # Read all messages and group them by topics
-    messages = {topic1: [], topic2: []}
+    reference_messages = []
+    target_messages = []
+
     while reader.has_next():
         topic, data, timestamp = reader.read_next()
-        if topic in messages:
+        if topic == reference_topic:
             msg_type = [x.type for x in topic_types if x.name == topic][0]
             module_name, class_name = msg_type.rsplit('/', 1)
             msg_module = importlib.import_module(module_name.replace('/', '.'))
             msg_class = getattr(msg_module, class_name)
             msg = deserialize_message(data, msg_class)
-            messages[topic].append((timestamp, msg))
+            reference_messages.append((timestamp, msg))
+        elif topic == target_topic:
+            msg_type = [x.type for x in topic_types if x.name == topic][0]
+            module_name, class_name = msg_type.rsplit('/', 1)
+            msg_module = importlib.import_module(module_name.replace('/', '.'))
+            msg_class = getattr(msg_module, class_name)
+            msg = deserialize_message(data, msg_class)
+            target_messages.append((timestamp, msg))
 
-    # Find minimum message count for alignment
-    min_message_count = min(len(messages[topic1]), len(messages[topic2]))
+    # Align target messages to reference messages
     aligned_messages = []
+    min_message_count = min(len(reference_messages), len(target_messages))
 
     for i in range(min_message_count):
-        ts1, msg1 = messages[topic1][i]
-        ts2, msg2 = messages[topic2][i]
+        ref_timestamp, ref_msg = reference_messages[i]
+        _, target_msg = target_messages[i]
 
-        # Use the average of the two timestamps as the new common timestamp
-        common_timestamp = (ts1 + ts2) // 2
+        # Update the target message's timestamp to match the reference
+        if hasattr(target_msg, 'header') and hasattr(target_msg.header, 'stamp'):
+            target_msg.header.stamp.sec = ref_timestamp // 10**9
+            target_msg.header.stamp.nanosec = ref_timestamp % 10**9
 
-        # Update timestamps in the messages
-        if hasattr(msg1, 'header') and hasattr(msg1.header, 'stamp'):
-            msg1.header.stamp.sec = common_timestamp // 10**9
-            msg1.header.stamp.nanosec = common_timestamp % 10**9
-
-        if hasattr(msg2, 'header') and hasattr(msg2.header, 'stamp'):
-            msg2.header.stamp.sec = common_timestamp // 10**9
-            msg2.header.stamp.nanosec = common_timestamp % 10**9
-
-        aligned_messages.append((topic1, common_timestamp, msg1))
-        aligned_messages.append((topic2, common_timestamp, msg2))
+        # Add both messages to the aligned list
+        aligned_messages.append((reference_topic, ref_timestamp, ref_msg))
+        aligned_messages.append((target_topic, ref_timestamp, target_msg))
 
     # Write aligned messages to the new bag
     for topic, timestamp, msg in aligned_messages:
@@ -71,12 +74,12 @@ def align_exact_timestamps(input_bag_path, output_bag_path, topic1, topic2):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("Usage: python align_exact_camera_topics.py <input_bag> <output_bag>")
+        print("Usage: python align_to_reference_topic.py <input_bag> <output_bag>")
         sys.exit(1)
 
     input_bag_path = sys.argv[1]
     output_bag_path = sys.argv[2]
-    topic1 = '/camera1/image_raw'
-    topic2 = '/camera2/image_raw'
+    reference_topic = '/camera1/image_raw'
+    target_topic = '/camera2/image_raw'
 
-    align_exact_timestamps(input_bag_path, output_bag_path, topic1, topic2)
+    align_to_reference_topic(input_bag_path, output_bag_path, reference_topic, target_topic)
