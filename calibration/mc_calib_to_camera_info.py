@@ -1,8 +1,12 @@
-import math
 import numpy as np
 import yaml
-import Quaternion as Q
 import cv2
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import Quaternion as Q
+
 
 def read_yaml(file_path):
     with open(file_path, 'r') as file:
