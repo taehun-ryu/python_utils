@@ -25,10 +25,10 @@ class Camera:
   def distortion(self):
     return self.distortion_
 
-  @property.setter
+  @camera_matrix.setter
   def camera_matrix(self, intrinsic):
     self.camera_matrix_ = intrinsic
-  @property.setter
+  @distortion.setter
   def distortion(self, distortion):
     self.distortion_ = distortion
 
@@ -42,10 +42,13 @@ class Camera:
       ret, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
           corners, ids, gray, self.charuco_board
       )
-      return ret, charuco_corners, charuco_ids
+      if charuco_ids is not None and len(charuco_ids) > 0:
+        return ret, charuco_corners, charuco_ids
+      else:
+        print("No Charuco corners detected")
     else:
-      ret, charuco_corners, charuco_ids = False, None, None
-      return ret, charuco_corners, charuco_ids
+      print("No markers detected")
+    return None, None, None
 
   def initFrame(self):
     """
@@ -100,7 +103,7 @@ class Camera:
 
 if __name__ == "__main__":
   # ArUco 및 Charuco 보드 설정
-  aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
+  aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
   '''
   6 x 9
   '''
@@ -109,12 +112,12 @@ if __name__ == "__main__":
   length_square = 0.083  # 사각형 크기 (미터 단위)
   length_marker = 0.062  # 마커 크기 (미터 단위)
 
-  charuco_board = cv2.aruco.CharucoBoard_create(
-      number_x_square, number_y_square, length_square, length_marker, aruco_dict
+  charuco_board = cv2.aruco.CharucoBoard(
+      (number_x_square, number_y_square), length_square, length_marker, aruco_dict
   )
 
   # 이미지 디렉토리
-  img_dir = "/dev/ssd2/ocam/calib/calib_1204/Cam_001"
+  img_dir = "/home/user/Downloads/calib_data/Seq02_Overlapping_multicamera/Cam_001"
 
   cam = Camera(img_dir, aruco_dict, charuco_board)
   cam.initFrame()

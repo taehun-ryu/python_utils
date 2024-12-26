@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import Camera
+from Camera import Camera
 
 class StereoCalib:
     def __init__(self, left_camera: Camera, right_camera: Camera, out_file):
@@ -104,8 +104,8 @@ if __name__ == "__main__":
     length_square = 0.083  # 사각형 크기 (미터 단위)
     length_marker = 0.062  # 마커 크기 (미터 단위)
 
-    charuco_board = cv2.aruco.CharucoBoard_create(
-        number_x_square, number_y_square, length_square, length_marker, aruco_dict
+    charuco_board = cv2.aruco.CharucoBoard(
+        (number_x_square, number_y_square), length_square, length_marker, aruco_dict
     )
     # 이미지 디렉토리
     img_dir_1 = "/dev/ssd2/ocam/calib/calib_1204/Cam_001"
