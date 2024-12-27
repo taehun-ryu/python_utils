@@ -1,13 +1,14 @@
+import os
 import cv2
 import numpy as np
 from Camera import Camera
 
 class StereoCalib:
-    def __init__(self, left_camera: Camera, right_camera: Camera, out_file):
-        self.out_file = out_file
+    def __init__(self, left_camera: Camera, right_camera: Camera):
         self.left_camera_ = left_camera
         self.right_camera_ = right_camera
         self.img_shape = self.left_camera_.img_shape
+        self.charuco_board = self.left_camera_.charuco_board
 
     def checkConsistency(self):
         """
@@ -29,8 +30,8 @@ class StereoCalib:
         image_points_2 = []
 
         # 각 프레임의 코너 ID를 기반으로 3D-2D 매칭 생성
-        for corners_1, ids_1, corners_2, ids_2 in zip(self.all_corners_cam_1, self.all_ids_cam_1,
-                                                    self.all_corners_cam_2, self.all_ids_cam_2):
+        for corners_1, ids_1, corners_2, ids_2 in zip(self.left_camera_.all_corners, self.left_camera_.all_ids,
+                                                    self.right_camera_.all_corners, self.right_camera_.all_ids):
             # 두 카메라에서 공통으로 검출된 코너 ID 찾기
             common_ids = np.intersect1d(ids_1.flatten(), ids_2.flatten())
             if len(common_ids) == 0:
@@ -38,7 +39,7 @@ class StereoCalib:
                 continue
 
             # 공통 ID에 해당하는 3D 점, 2D 점 추출
-            obj_pts = self.charuco_board.chessboardCorners[common_ids]
+            obj_pts = self.charuco_board.getChessboardCorners()[common_ids]
             img_pts_1 = [corners_1[ids_1.flatten() == id][0] for id in common_ids]
             img_pts_2 = [corners_2[ids_2.flatten() == id][0] for id in common_ids]
 
@@ -66,7 +67,11 @@ class StereoCalib:
         return ret, R, T
 
     def saves(self, filename, ret, R, T, camera_matrix_1, dist_coeffs_1, camera_matrix_2, dist_coeffs_2):
-        fs = cv2.FileStorage(filename, cv2.FILE_STORAGE_WRITE)
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        calibration_dir = script_dir
+        file_path = os.path.join(calibration_dir, filename)
+
+        fs = cv2.FileStorage(file_path, cv2.FILE_STORAGE_WRITE)
         fs.write("RMS_Error", ret)
         fs.write("Camera_Matrix_1", camera_matrix_1)
         fs.write("Distortion_Coefficients_1", dist_coeffs_1)
@@ -75,11 +80,12 @@ class StereoCalib:
         fs.write("Rotation_Matrix", R)
         fs.write("Translation_Vector", T)
         fs.release()
-        print(f"Stereo calibrations saved to {filename}")
+
+        print(f"Stereo calibrations saved to {file_path}")
 
     def run(self):
         print("Performing Stereo Calibration...")
-        ret, R, T = self.perform_stereo_calibration( \
+        ret, R, T = self.performStereoCalibration( \
             self.left_camera_.camera_matrix, self.left_camera_.distortion, \
             self.right_camera_.camera_matrix, self.right_camera_.distortion)
 
@@ -88,7 +94,7 @@ class StereoCalib:
         print("Rotation Matrix (R):\n", R)
         print("Translation Vector (T):\n", T)
 
-        self.saves("stereo_calibrations.yaml", ret, R, T, \
+        self.saves("stereo_calib.yaml", ret, R, T, \
             self.left_camera_.camera_matrix, self.left_camera_.distortion, \
             self.right_camera_.camera_matrix, self.right_camera_.distortion)
 
@@ -96,20 +102,17 @@ class StereoCalib:
 if __name__ == "__main__":
     # ArUco 및 Charuco 보드 설정
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
-    '''
-    6 x 9
-    '''
-    number_x_square = 6
-    number_y_square = 9
-    length_square = 0.083  # 사각형 크기 (미터 단위)
-    length_marker = 0.062  # 마커 크기 (미터 단위)
+    number_x_square = 5
+    number_y_square = 5
+    length_square = 0.098  # 사각형 크기 (미터 단위)
+    length_marker = 0.073  # 마커 크기 (미터 단위)
 
     charuco_board = cv2.aruco.CharucoBoard(
         (number_x_square, number_y_square), length_square, length_marker, aruco_dict
     )
     # 이미지 디렉토리
-    img_dir_1 = "/dev/ssd2/ocam/calib/calib_1204/Cam_001"
-    img_dir_2 = "/dev/ssd2/ocam/calib/calib_1204/Cam_002"
+    img_dir_1 = "/home/user/calib_data/Cam_001"
+    img_dir_2 = "/home/user/calib_data/Cam_002"
     # 카메라 객체 생성 및 초기화
     left_camera = Camera(img_dir_1, aruco_dict, charuco_board)
     right_camera = Camera(img_dir_2, aruco_dict, charuco_board)
@@ -119,7 +122,6 @@ if __name__ == "__main__":
     right_camera.initCalibration()
 
     # 스테레오 캘리브레이션 실행
-    out_file = "/dev/ssd2/ocam/calib/calib_1204/stereo_result.yaml"
-    stereo_calib = StereoCalib(left_camera, right_camera, out_file)
+    stereo_calib = StereoCalib(left_camera, right_camera)
     stereo_calib.checkConsistency()
     stereo_calib.run()

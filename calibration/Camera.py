@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 import glob
 
 class Camera:
@@ -38,6 +37,7 @@ class Camera:
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     corners, ids, _ = cv2.aruco.detectMarkers(gray, self.aruco_dict)
+
     if ids is not None and len(ids) > 0:
       ret, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
           corners, ids, gray, self.charuco_board
@@ -104,20 +104,17 @@ class Camera:
 if __name__ == "__main__":
   # ArUco 및 Charuco 보드 설정
   aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
-  '''
-  6 x 9
-  '''
-  number_x_square = 6
-  number_y_square = 9
-  length_square = 0.083  # 사각형 크기 (미터 단위)
-  length_marker = 0.062  # 마커 크기 (미터 단위)
+  number_x_square = 5
+  number_y_square = 5
+  length_square = 0.098  # 사각형 크기 (미터 단위)
+  length_marker = 0.073  # 마커 크기 (미터 단위)
 
   charuco_board = cv2.aruco.CharucoBoard(
       (number_x_square, number_y_square), length_square, length_marker, aruco_dict
   )
 
   # 이미지 디렉토리
-  img_dir = "/home/user/Downloads/calib_data/Seq02_Overlapping_multicamera/Cam_001"
+  img_dir = "/home/user/calib_data/Cam_001"
 
   cam = Camera(img_dir, aruco_dict, charuco_board)
   cam.initFrame()
