@@ -81,6 +81,9 @@ class Camera:
         raise IndexError("Invalid frame index")
     return self.frames_[idx]
 
+  def size(self):
+    return len(self.frames_)
+
   def initCalibration(self):
     """
     1) 모든 frame에서 감지된 코너와 아이디를 이용하여 calibration 수행
