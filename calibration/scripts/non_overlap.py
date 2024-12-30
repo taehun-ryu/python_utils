@@ -24,4 +24,4 @@ camera_1.run(save=False)
 camera_2.run(save=False)
 
 non_overlap_calib = NonOverlapCalib(camera_1, camera_2)
-non_overlap_calib.run(False)
+non_overlap_calib.run(save=True)
