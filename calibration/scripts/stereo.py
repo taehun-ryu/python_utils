@@ -29,7 +29,7 @@ stereo_calib.run(save=True)
 
 # plot results
 plotter = FramePlotter()
-plotter.add_camera(stereo_calib.R, stereo_calib.T, label="Cam2")
+plotter.add_camera(stereo_calib.R.T, - stereo_calib.R.T@stereo_calib.T, label="Cam2")
 plotter.plot_frames()
 
 # Save camera info
