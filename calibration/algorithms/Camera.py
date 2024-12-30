@@ -123,7 +123,7 @@ class Camera:
     fs.release()
     print(f"Calibration saved to {filepath}")
 
-  def run(self):
+  def run(self, save=False):
     """
     1) 이미지 디렉토리에서 이미지를 읽어들여 calibration 수행
     2) calibration 결과를 파일로 저장
@@ -131,4 +131,6 @@ class Camera:
     self.initFrame()
     self.initCalibration()
     print("Calibration completed")
-    self.save(f"{project_root}/calibration/results/mono.yaml", self.camera_matrix, self.distortion)
+
+    if save:
+      self.save(f"{project_root}/calibration/results/mono.yaml", self.camera_matrix, self.distortion)

@@ -82,14 +82,16 @@ class StereoCalib:
         fs.release()
         print(f"Stereo calibrations saved to {filepath}")
 
-    def run(self):
+    def run(self, save=False):
         self.checkConsistency()
         print("Performing Stereo Calibration...")
         ret, self.R, self.T = self.performStereoCalibration( \
             self.left_camera_.camera_matrix, self.left_camera_.distortion, \
             self.right_camera_.camera_matrix, self.right_camera_.distortion)
         print("Stereo Calibration complete.")
-        self.save(f"{project_root}/calibration/results/stereo.yaml", \
-            self.left_camera_.camera_matrix, self.left_camera_.distortion, \
-            self.right_camera_.camera_matrix, self.right_camera_.distortion, \
-            self.R, self.T)
+
+        if save:
+            self.save(f"{project_root}/calibration/results/stereo.yaml", \
+                self.left_camera_.camera_matrix, self.left_camera_.distortion, \
+                self.right_camera_.camera_matrix, self.right_camera_.distortion, \
+                self.R, self.T)

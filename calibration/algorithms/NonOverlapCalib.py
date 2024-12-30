@@ -299,7 +299,7 @@ class NonOverlapCalib:
     fs.release()
     print(f"Non-overlapping calibrations saved to {filepath}")
 
-  def run(self):
+  def run(self, save=False):
     self.checkConsistency()
     pose_abs_1, pose_abs_2 = self.initNonOverlapPair(self.camera_1, self.camera_2)
     nb_cluster = 10
@@ -307,7 +307,9 @@ class NonOverlapCalib:
     pose_c1_c2 = self.handeyeBootstraptTranslationCalibration(nb_cluster, nb_it, pose_abs_1, pose_abs_2)
     self.R, self.T = gts.Proj2RT(pose_c1_c2)
     print("Non-overlapping calibration complete")
-    self.save(f"{project_root}/calibration/results/non_overlap.yaml", \
-        self.camera_1.camera_matrix, self.camera_1.distortion, \
-        self.camera_2.camera_matrix, self.camera_2.distortion, \
-        self.R, self.T)
+
+    if save:
+      self.save(f"{project_root}/calibration/results/non_overlap.yaml", \
+          self.camera_1.camera_matrix, self.camera_1.distortion, \
+          self.camera_2.camera_matrix, self.camera_2.distortion, \
+          self.R, self.T)
