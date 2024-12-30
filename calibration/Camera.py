@@ -1,5 +1,6 @@
 import cv2
 import glob
+from CheckerBoards import CharucoBoard_6_9_0_26, CharucoBoard_6_9_27_53, CharucoBoard_5_5_0_11
 
 class Camera:
   def __init__(self, img_dir, aruco_dict, charuco_board):
@@ -37,18 +38,18 @@ class Camera:
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     corners, ids, _ = cv2.aruco.detectMarkers(gray, self.aruco_dict)
+    state : str = ""
 
     if ids is not None and len(ids) > 0:
-      ret, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
+      _, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
           corners, ids, gray, self.charuco_board
       )
       if charuco_ids is not None and len(charuco_ids) > 0:
-        return ret, charuco_corners, charuco_ids
+        return "true", charuco_corners, charuco_ids
       else:
-        print("No Charuco corners detected")
+        return "non_corner", None, None
     else:
-      print("No markers detected")
-    return None, None, None
+      return "non_marker", None, None
 
   def initFrame(self):
     """
@@ -61,16 +62,24 @@ class Camera:
       img = cv2.imread(img_path)
       if self.img_shape is None:
         self.img_shape = img.shape[:2][::-1]
-      ret, corners, ids = self.detectCharucoCornersAndIds(img)
+      str, corners, ids = self.detectCharucoCornersAndIds(img)
       frame_info = {
         "image": img,
         "corners": corners,
         "ids": ids
       }
-      if ret:
+      if str == "non_corner":
+        print(f"No charuco corners detected in {img_path}")
+        continue
+      elif str == "non_marker":
+        print(f"No markers detected in {img_path}")
+        continue
+      elif str == "true":
         self.all_corners.append(corners)
         self.all_ids.append(ids)
         frames.append(frame_info)
+      else:
+        raise ValueError("Invalid state")
     self.frames_ = frames
 
   def getFrame(self, idx: int):
@@ -89,6 +98,7 @@ class Camera:
     1) 모든 frame에서 감지된 코너와 아이디를 이용하여 calibration 수행
     2) 각 frames_[i]에서 Board2Cam 계산 -> non-overlapping calibration에 사용
     """
+    print("Calibrating camera...")
     ret, camera_matrix, distortion, rvecs, tvecs = cv2.aruco.calibrateCameraCharuco(
       charucoCorners=self.all_corners,
       charucoIds=self.all_ids,
@@ -105,21 +115,17 @@ class Camera:
 
 
 if __name__ == "__main__":
-  # ArUco 및 Charuco 보드 설정
-  aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_1000)
-  number_x_square = 5
-  number_y_square = 5
-  length_square = 0.098  # 사각형 크기 (미터 단위)
-  length_marker = 0.073  # 마커 크기 (미터 단위)
-
-  charuco_board = cv2.aruco.CharucoBoard(
-      (number_x_square, number_y_square), length_square, length_marker, aruco_dict
-  )
+  # Our Lab's 5x5 Charuco Board
+  board = CharucoBoard_5_5_0_11()
+  # Our Lab's 6x9 Charuco Board 1
+  board_1 = CharucoBoard_6_9_0_26()
+  # Our Lab's 6x9 Charuco Board 2
+  board_2 = CharucoBoard_6_9_27_53()
 
   # 이미지 디렉토리
-  img_dir = "/home/user/calib_data/Cam_001"
+  img_dir = "/home/user/calib_data/non_overlap/1/Cam_002"
 
-  cam = Camera(img_dir, aruco_dict, charuco_board)
+  cam = Camera(img_dir, board_2.aruco_dict, board_2.board)
   cam.initFrame()
   cam.initCalibration()
   print(cam.camera_matrix)

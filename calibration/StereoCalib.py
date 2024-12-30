@@ -2,6 +2,7 @@ import os
 import cv2
 import numpy as np
 from Camera import Camera
+from CheckerBoards import CharucoBoard_5_5_0_11
 
 class StereoCalib:
     def __init__(self, left_camera: Camera, right_camera: Camera):
@@ -100,22 +101,16 @@ class StereoCalib:
 
 
 if __name__ == "__main__":
-    # ArUco 및 Charuco 보드 설정
-    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
-    number_x_square = 5
-    number_y_square = 5
-    length_square = 0.098  # 사각형 크기 (미터 단위)
-    length_marker = 0.073  # 마커 크기 (미터 단위)
+    # Our Lab's 5x5 Charuco Board
+    board = CharucoBoard_5_5_0_11()
 
-    charuco_board = cv2.aruco.CharucoBoard(
-        (number_x_square, number_y_square), length_square, length_marker, aruco_dict
-    )
     # 이미지 디렉토리
-    img_dir_1 = "/home/user/calib_data/Cam_001"
-    img_dir_2 = "/home/user/calib_data/Cam_002"
+    img_dir_1 = "/home/user/calib_data/stereo/Cam_001"
+    img_dir_2 = "/home/user/calib_data/stereo/Cam_002"
+
     # 카메라 객체 생성 및 초기화
-    left_camera = Camera(img_dir_1, aruco_dict, charuco_board)
-    right_camera = Camera(img_dir_2, aruco_dict, charuco_board)
+    left_camera = Camera(img_dir_1, board.aruco_dict, board.board)
+    right_camera = Camera(img_dir_2, board.aruco_dict, board.board)
     left_camera.initFrame()
     right_camera.initFrame()
     left_camera.initCalibration()

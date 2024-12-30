@@ -6,6 +6,7 @@
 
 import cv2
 from Camera import Camera
+from CheckerBoards import CharucoBoard_6_9_0_26, CharucoBoard_6_9_27_53
 import geometrytools as gts
 import numpy as np
 import itertools
@@ -288,22 +289,18 @@ class NonOverlapCalib:
     print(pose_c1_c2)
 
 if __name__ == "__main__":
-  # ArUco 및 Charuco 보드 설정
-  aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_50)
-  number_x_square = 5
-  number_y_square = 5
-  length_square = 0.098  # 사각형 크기 (미터 단위)
-  length_marker = 0.073  # 마커 크기 (미터 단위)
 
-  charuco_board = cv2.aruco.CharucoBoard(
-      (number_x_square, number_y_square), length_square, length_marker, aruco_dict
-  )
+  # Our Lab's Charuco Board 1
+  board_1 = CharucoBoard_6_9_0_26()
+  # Our Lab's Charuco Board 2
+  board_2 = CharucoBoard_6_9_27_53()
+
   # 이미지 디렉토리
-  img_dir_1 = "/home/user/calib_data/Cam_001"
-  img_dir_2 = "/home/user/calib_data/Cam_002"
+  img_dir_1 = "/home/user/calib_data/non_overlap/1/Cam_001"
+  img_dir_2 = "/home/user/calib_data/non_overlap/1/Cam_002"
   # 카메라 객체 생성 및 초기화
-  camera_1 = Camera(img_dir_1, aruco_dict, charuco_board)
-  camera_2 = Camera(img_dir_2, aruco_dict, charuco_board)
+  camera_1 = Camera(img_dir_1, board_1.aruco_dict, board_1.board)
+  camera_2 = Camera(img_dir_2, board_2.aruco_dict, board_2.board)
   camera_1.initFrame()
   camera_2.initFrame()
   camera_1.initCalibration()
