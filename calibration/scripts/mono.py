@@ -4,7 +4,6 @@ import sys
 # Import custom modules
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
 sys.path.append(project_root)
-from calibration.tools.CalibrationYAML import CalibrationYAML
 from calibration.algorithms.Camera import Camera
 from calibration.tools.CheckerBoards import *
 

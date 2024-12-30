@@ -4,10 +4,11 @@ import sys
 # Import custom modules
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
 sys.path.append(project_root)
-from calibration.tools.CalibrationYAML import CalibrationYAML
+from calibration.tools.CameraInfoConverter import CameraInfoConverter
 from calibration.algorithms.Camera import Camera
 from calibration.algorithms.StereoCalib import StereoCalib
 from calibration.tools.CheckerBoards import *
+from calibration.tools.FramePlotter import FramePlotter
 
 # Our Lab's 5x5 Charuco Board
 board = CharucoBoard_5_5_0_11()
@@ -25,3 +26,12 @@ right_camera.run(save=False)
 # 스테레오 캘리브레이션 실행
 stereo_calib = StereoCalib(left_camera, right_camera)
 stereo_calib.run(save=True)
+
+# plot results
+plotter = FramePlotter()
+plotter.add_camera(stereo_calib.R, stereo_calib.T, label="Cam2")
+plotter.plot_frames()
+
+# Save camera info
+converter = CameraInfoConverter(stereo_calib, 'stereo')
+converter.run()

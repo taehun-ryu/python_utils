@@ -22,6 +22,7 @@ class NonOverlapCalib:
   def __init__(self, camera_1, camera_2):
     self.camera_1 = camera_1
     self.camera_2 = camera_2
+    self.image_shape = self.camera_1.img_shape
     # results
     self.R = None
     self.T = None
@@ -30,6 +31,8 @@ class NonOverlapCalib:
     """
     두 카메라의 이미지 수, 코너 수, 아이디 수가 일치하는지 확인
     """
+    #FIXME: 두 카메라에서 공통으로 코너가 검출된 프레임만 사용하도록 수정
+    #       둘 중 하나만 코너가 검출된 시점은 제외시켜야 함.
     if len(self.camera_1.all_corners) != len(self.camera_2.all_corners):
       raise ValueError("Number of frames captured by the two cameras do not match.")
     if len(self.camera_1.all_ids) != len(self.camera_2.all_ids):
@@ -181,7 +184,7 @@ class NonOverlapCalib:
         pose_abs_1 (vector<T>): 첫 번째 카메라의 frame간 포즈
         pose_abs_2 (vector<T>): 두 번째 카메라의 frame간 포즈
     """
-    print("Bootstrapt handeye calibration 실행...")
+    print("Bootstrapt handeye calibration...")
 
     position_1_2 = self.getTranslationForClustering(pose_abs_1, pose_abs_2)
     num_poses = len(position_1_2)
@@ -226,12 +229,12 @@ class NonOverlapCalib:
 
       return pose_c1_c2
     else:
-      print("[WARN] Run the normal handeye calibration on all the samples")
+      print(f"[WARN] nb_success is {nb_success}. Run the normal handeye calibration on all the samples")
       pose_c1_c2 = self.handeyeNormalCalibration(pose_abs_1, pose_abs_2)
       return pose_c1_c2
 
   def handeyeNormalCalibration(self, pose_abs_1, pose_abs_2):
-    print("Normal handeye calibration 실행...")
+    print("Normal handeye calibration...")
     num_poses = min(len(pose_abs_1), len(pose_abs_2)) # It should be the same
     r_cam_1, r_cam_2, t_cam_1, t_cam_2 = [], [], [], []
     for i in range(num_poses):
@@ -290,6 +293,8 @@ class NonOverlapCalib:
 
   def save(self, filepath, camera_matrix_1, dist_coeffs_1, camera_matrix_2, dist_coeffs_2, R, T, ):
     fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_WRITE)
+    fs.write("image_width", self.image_shape[0])
+    fs.write("image_height", self.image_shape[1])
     fs.write("K_1", camera_matrix_1)
     fs.write("d_1", dist_coeffs_1)
     fs.write("K_2", camera_matrix_2)
@@ -297,7 +302,17 @@ class NonOverlapCalib:
     fs.write("Rotation", R)
     fs.write("Translation", T)
     fs.release()
-    print(f"Non-overlapping calibrations saved to {filepath}")
+    # FileStorage로 저장이 끝난 후, 문자열 치환 작업
+    with open(filepath, "r") as f:
+        data = f.read()
+
+    data = data.replace(" !!opencv-matrix", "")
+    data = data.replace("%YAML:1.0", "#%YAML:1.0")
+
+    with open(filepath, "w") as f:
+        f.write(data)
+
+    print(f"Stereo calibrations saved to {filepath}")
 
   def run(self, save=False):
     self.checkConsistency()

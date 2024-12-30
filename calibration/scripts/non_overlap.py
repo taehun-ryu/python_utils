@@ -4,10 +4,11 @@ import sys
 # Import custom modules
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
 sys.path.append(project_root)
-from calibration.tools.CalibrationYAML import CalibrationYAML
+from calibration.tools.CameraInfoConverter import CameraInfoConverter
 from calibration.algorithms.Camera import Camera
 from calibration.algorithms.NonOverlapCalib import NonOverlapCalib
 from calibration.tools.CheckerBoards import *
+from calibration.tools.FramePlotter import FramePlotter
 
 # Our Lab's Charuco Board 1
 board_1 = CharucoBoard_6_9_0_26()
@@ -25,3 +26,12 @@ camera_2.run(save=False)
 
 non_overlap_calib = NonOverlapCalib(camera_1, camera_2)
 non_overlap_calib.run(save=True)
+
+# plot results
+plotter = FramePlotter()
+plotter.add_camera(non_overlap_calib.R, non_overlap_calib.T, label="Cam2")
+plotter.plot_frames()
+
+# Save camera info
+converter = CameraInfoConverter(non_overlap_calib, 'non_overlap')
+converter.run()

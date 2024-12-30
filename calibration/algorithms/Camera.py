@@ -1,5 +1,6 @@
 import cv2
 import glob
+import numpy as np
 import os
 
 # Set project root path
@@ -113,15 +114,31 @@ class Camera:
     self.camera_matrix = camera_matrix
     self.distortion = distortion
     for i in range(len(rvecs)):
-        self.frames_[i]["board2cam_r"] = rvecs[i]  # Rotation vectors(Rodrigues)
-        self.frames_[i]["board2cam_t"] = tvecs[i]
+        R, _ = cv2.Rodrigues(rvecs[i])
+        R_inv = R.T
+        rvec_inv, _ = cv2.Rodrigues(R_inv)
+        tvec_inv = -np.dot(R_inv, tvecs[i])
+        self.frames_[i]["board2cam_r"] = rvec_inv  # Rotation vectors(Rodrigues)
+        self.frames_[i]["board2cam_t"] = tvec_inv
 
   def save(self, filepath, camera_matrix, dist_coeffs):
     fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_WRITE)
+    fs.write("image_width", self.img_shape[0])
+    fs.write("image_height", self.img_shape[1])
     fs.write("K", camera_matrix)
     fs.write("d", dist_coeffs)
     fs.release()
-    print(f"Calibration saved to {filepath}")
+    # FileStorage로 저장이 끝난 후, 문자열 치환 작업
+    with open(filepath, "r") as f:
+        data = f.read()
+
+    data = data.replace(" !!opencv-matrix", "")
+    data = data.replace("%YAML:1.0", "#%YAML:1.0")
+
+    with open(filepath, "w") as f:
+        f.write(data)
+
+    print(f"Stereo calibrations saved to {filepath}")
 
   def run(self, save=False):
     """

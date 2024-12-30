@@ -73,6 +73,8 @@ class StereoCalib:
 
     def save(self, filepath, camera_matrix_1, dist_coeffs_1, camera_matrix_2, dist_coeffs_2, R, T, ):
         fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_WRITE)
+        fs.write("image_width", self.img_shape[0])
+        fs.write("image_height", self.img_shape[1])
         fs.write("K_1", camera_matrix_1)
         fs.write("d_1", dist_coeffs_1)
         fs.write("K_2", camera_matrix_2)
@@ -80,6 +82,17 @@ class StereoCalib:
         fs.write("Rotation", R)
         fs.write("Translation", T)
         fs.release()
+
+        # FileStorage로 저장이 끝난 후, 문자열 치환 작업
+        with open(filepath, "r") as f:
+            data = f.read()
+
+        data = data.replace(" !!opencv-matrix", "")
+        data = data.replace("%YAML:1.0", "#%YAML:1.0")
+
+        with open(filepath, "w") as f:
+            f.write(data)
+
         print(f"Stereo calibrations saved to {filepath}")
 
     def run(self, save=False):
