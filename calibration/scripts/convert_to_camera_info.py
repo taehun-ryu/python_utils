@@ -1,7 +1,14 @@
 import numpy as np
-from CalibrationYAML import *
 
-file_path = 'stereo_calib.yaml'
+# Set project root path
+import os
+import sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
+sys.path.append(project_root)
+# Import custom modules in other directories
+from calibration.algorithms import CalibrationYAML
+
+file_path = '/home/user/python_utils/calibration/stereo_calib.yaml'
 calib = CalibrationYAML(file_path)
 
 # image size

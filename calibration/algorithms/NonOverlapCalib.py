@@ -5,13 +5,21 @@
 # If you want to use a different setup, such as having 4 non-overlapping cameras, you must implement new code, leveraging this code.
 
 import cv2
-from Camera import Camera
-from CheckerBoards import CharucoBoard_6_9_0_26, CharucoBoard_6_9_27_53
-import geometrytools as gts
 import numpy as np
 import itertools
 import random
 from typing import List
+
+# Set project root path
+import os
+import sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
+sys.path.append(project_root)
+# Import custom modules in other directories
+from calibration.tools import geometrytools as gts
+# Import custom modules in the same directory
+from Camera import Camera
+from CheckerBoards import CharucoBoard_6_9_0_26, CharucoBoard_6_9_27_53
 
 class NonOverlapCalib:
   def __init__(self, camera_1: Camera, camera_2: Camera):

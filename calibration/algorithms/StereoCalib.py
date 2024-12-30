@@ -67,23 +67,6 @@ class StereoCalib:
         )
         return ret, R, T
 
-    def saves(self, filename, ret, R, T, camera_matrix_1, dist_coeffs_1, camera_matrix_2, dist_coeffs_2):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        calibration_dir = script_dir
-        file_path = os.path.join(calibration_dir, filename)
-
-        fs = cv2.FileStorage(file_path, cv2.FILE_STORAGE_WRITE)
-        fs.write("RMS_Error", ret)
-        fs.write("Camera_Matrix_1", camera_matrix_1)
-        fs.write("Distortion_Coefficients_1", dist_coeffs_1)
-        fs.write("Camera_Matrix_2", camera_matrix_2)
-        fs.write("Distortion_Coefficients_2", dist_coeffs_2)
-        fs.write("Rotation_Matrix", R)
-        fs.write("Translation_Vector", T)
-        fs.release()
-
-        print(f"Stereo calibrations saved to {file_path}")
-
     def run(self):
         print("Performing Stereo Calibration...")
         ret, R, T = self.performStereoCalibration( \
@@ -94,11 +77,6 @@ class StereoCalib:
         print("RMS Error:", ret)
         print("Rotation Matrix (R):\n", R)
         print("Translation Vector (T):\n", T)
-
-        self.saves("stereo_calib.yaml", ret, R, T, \
-            self.left_camera_.camera_matrix, self.left_camera_.distortion, \
-            self.right_camera_.camera_matrix, self.right_camera_.distortion)
-
 
 if __name__ == "__main__":
     # Our Lab's 5x5 Charuco Board

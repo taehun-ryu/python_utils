@@ -2,11 +2,15 @@ import numpy as np
 import yaml
 import cv2
 from functools import singledispatchmethod
-
-import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import Quaternion as Q
+import sys
+
+# Set project root path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
+sys.path.append(project_root)
+# Import custom modules
+from pose import Quaternion as Q
+
 
 class CalibrationYAML:
     data = None
@@ -53,8 +57,14 @@ class CalibrationYAML:
             }
         }
 
+        calibration_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'calibration')
+        os.makedirs(calibration_dir, exist_ok=True)
+
+        # 파일 경로 완성
+        full_file_path = os.path.join(calibration_dir, file_path)
+
         # YAML 저장
-        with open(file_path, 'w') as file:
+        with open(full_file_path, 'w') as file:
             file.write("#%YAML:1.0\n")  # YAML 버전 표기
             yaml.dump(camera_info, file, default_flow_style=None, sort_keys=False)
 
