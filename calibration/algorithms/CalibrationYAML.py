@@ -57,7 +57,7 @@ class CalibrationYAML:
             }
         }
 
-        calibration_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'calibration')
+        calibration_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'calibration', 'results')
         os.makedirs(calibration_dir, exist_ok=True)
 
         # 파일 경로 완성

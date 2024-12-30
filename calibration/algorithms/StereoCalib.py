@@ -1,15 +1,19 @@
-import os
 import cv2
 import numpy as np
-from Camera import Camera
-from CheckerBoards import CharucoBoard_5_5_0_11
+import os
+
+# Set project root path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
 
 class StereoCalib:
-    def __init__(self, left_camera: Camera, right_camera: Camera):
+    def __init__(self, left_camera, right_camera):
         self.left_camera_ = left_camera
         self.right_camera_ = right_camera
         self.img_shape = self.left_camera_.img_shape
         self.charuco_board = self.left_camera_.charuco_board
+        # results
+        self.R = None
+        self.T = None
 
     def checkConsistency(self):
         """
@@ -67,34 +71,25 @@ class StereoCalib:
         )
         return ret, R, T
 
+    def save(self, filepath, camera_matrix_1, dist_coeffs_1, camera_matrix_2, dist_coeffs_2, R, T, ):
+        fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_WRITE)
+        fs.write("K_1", camera_matrix_1)
+        fs.write("d_1", dist_coeffs_1)
+        fs.write("K_2", camera_matrix_2)
+        fs.write("d_2", dist_coeffs_2)
+        fs.write("Rotation", R)
+        fs.write("Translation", T)
+        fs.release()
+        print(f"Stereo calibrations saved to {filepath}")
+
     def run(self):
+        self.checkConsistency()
         print("Performing Stereo Calibration...")
-        ret, R, T = self.performStereoCalibration( \
+        ret, self.R, self.T = self.performStereoCalibration( \
             self.left_camera_.camera_matrix, self.left_camera_.distortion, \
             self.right_camera_.camera_matrix, self.right_camera_.distortion)
-
-        print("Stereo Calibrations:")
-        print("RMS Error:", ret)
-        print("Rotation Matrix (R):\n", R)
-        print("Translation Vector (T):\n", T)
-
-if __name__ == "__main__":
-    # Our Lab's 5x5 Charuco Board
-    board = CharucoBoard_5_5_0_11()
-
-    # 이미지 디렉토리
-    img_dir_1 = "/home/user/calib_data/stereo/Cam_001"
-    img_dir_2 = "/home/user/calib_data/stereo/Cam_002"
-
-    # 카메라 객체 생성 및 초기화
-    left_camera = Camera(img_dir_1, board.aruco_dict, board.board)
-    right_camera = Camera(img_dir_2, board.aruco_dict, board.board)
-    left_camera.initFrame()
-    right_camera.initFrame()
-    left_camera.initCalibration()
-    right_camera.initCalibration()
-
-    # 스테레오 캘리브레이션 실행
-    stereo_calib = StereoCalib(left_camera, right_camera)
-    stereo_calib.checkConsistency()
-    stereo_calib.run()
+        print("Stereo Calibration complete.")
+        self.save(f"{project_root}/calibration/results/stereo.yaml", \
+            self.left_camera_.camera_matrix, self.left_camera_.distortion, \
+            self.right_camera_.camera_matrix, self.right_camera_.distortion, \
+            self.R, self.T)

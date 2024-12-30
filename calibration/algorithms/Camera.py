@@ -1,15 +1,15 @@
 import cv2
 import glob
-from CheckerBoards import CharucoBoard_6_9_0_26, CharucoBoard_6_9_27_53, CharucoBoard_5_5_0_11
+import os
+
+# Set project root path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')) # python_utils/
 
 class Camera:
   def __init__(self, img_dir, aruco_dict, charuco_board):
     # Image
     self.img_dir = img_dir
     self.img_shape = None
-    # Camera information
-    self.camera_matrix_ = None  # 내부 파라미터 행렬
-    self.distortion_ = None  # 왜곡 계수
     # Board
     self.aruco_dict = aruco_dict
     self.charuco_board = charuco_board
@@ -17,6 +17,9 @@ class Camera:
     self.all_ids = []
     # Frames
     self.frames_ = None
+    # Results(Camera information)
+    self.camera_matrix_ = None  # 내부 파라미터 행렬
+    self.distortion_ = None  # 왜곡 계수
 
   @property
   def camera_matrix(self):
@@ -113,20 +116,19 @@ class Camera:
         self.frames_[i]["board2cam_r"] = rvecs[i]  # Rotation vectors(Rodrigues)
         self.frames_[i]["board2cam_t"] = tvecs[i]
 
+  def save(self, filepath, camera_matrix, dist_coeffs):
+    fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_WRITE)
+    fs.write("K", camera_matrix)
+    fs.write("d", dist_coeffs)
+    fs.release()
+    print(f"Calibration saved to {filepath}")
 
-if __name__ == "__main__":
-  # Our Lab's 5x5 Charuco Board
-  board = CharucoBoard_5_5_0_11()
-  # Our Lab's 6x9 Charuco Board 1
-  board_1 = CharucoBoard_6_9_0_26()
-  # Our Lab's 6x9 Charuco Board 2
-  board_2 = CharucoBoard_6_9_27_53()
-
-  # 이미지 디렉토리
-  img_dir = "/home/user/calib_data/non_overlap/1/Cam_002"
-
-  cam = Camera(img_dir, board_2.aruco_dict, board_2.board)
-  cam.initFrame()
-  cam.initCalibration()
-  print(cam.camera_matrix)
-  print(cam.distortion)
+  def run(self):
+    """
+    1) 이미지 디렉토리에서 이미지를 읽어들여 calibration 수행
+    2) calibration 결과를 파일로 저장
+    """
+    self.initFrame()
+    self.initCalibration()
+    print("Calibration completed")
+    self.save(f"{project_root}/calibration/results/mono.yaml", self.camera_matrix, self.distortion)

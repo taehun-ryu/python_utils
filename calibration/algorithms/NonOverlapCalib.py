@@ -17,14 +17,14 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 sys.path.append(project_root)
 # Import custom modules in other directories
 from calibration.tools import geometrytools as gts
-# Import custom modules in the same directory
-from Camera import Camera
-from CheckerBoards import CharucoBoard_6_9_0_26, CharucoBoard_6_9_27_53
 
 class NonOverlapCalib:
-  def __init__(self, camera_1: Camera, camera_2: Camera):
+  def __init__(self, camera_1, camera_2):
     self.camera_1 = camera_1
     self.camera_2 = camera_2
+    # results
+    self.R = None
+    self.T = None
 
   def checkConsistency(self):
     """
@@ -252,7 +252,7 @@ class NonOverlapCalib:
 
     return pose_c1_c2
 
-  def getPoseBetweenFrames(self, camera: Camera, i, j):
+  def getPoseBetweenFrames(self, camera, i, j):
     """
     board2frame1과 board2frame2를 통해 frame1과 frame2 사이의 변환 행렬을 계산
     """
@@ -269,7 +269,7 @@ class NonOverlapCalib:
 
     return f2f
 
-  def initNonOverlapPair(self, camera_1: Camera, camera_2: Camera):
+  def initNonOverlapPair(self, camera_1, camera_2):
     """
     두 카메라의 이미지 쌍을 초기화
     """
@@ -288,32 +288,26 @@ class NonOverlapCalib:
 
     return pose_abs_1, pose_abs_2
 
+  def save(self, filepath, camera_matrix_1, dist_coeffs_1, camera_matrix_2, dist_coeffs_2, R, T, ):
+    fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_WRITE)
+    fs.write("K_1", camera_matrix_1)
+    fs.write("d_1", dist_coeffs_1)
+    fs.write("K_2", camera_matrix_2)
+    fs.write("d_2", dist_coeffs_2)
+    fs.write("Rotation", R)
+    fs.write("Translation", T)
+    fs.release()
+    print(f"Non-overlapping calibrations saved to {filepath}")
+
   def run(self):
     self.checkConsistency()
     pose_abs_1, pose_abs_2 = self.initNonOverlapPair(self.camera_1, self.camera_2)
     nb_cluster = 10
     nb_it = 200
     pose_c1_c2 = self.handeyeBootstraptTranslationCalibration(nb_cluster, nb_it, pose_abs_1, pose_abs_2)
-    print(pose_c1_c2)
-
-if __name__ == "__main__":
-
-  # Our Lab's Charuco Board 1
-  board_1 = CharucoBoard_6_9_0_26()
-  # Our Lab's Charuco Board 2
-  board_2 = CharucoBoard_6_9_27_53()
-
-  # 이미지 디렉토리
-  img_dir_1 = "/home/user/calib_data/non_overlap/1/Cam_001"
-  img_dir_2 = "/home/user/calib_data/non_overlap/1/Cam_002"
-  # 카메라 객체 생성 및 초기화
-  camera_1 = Camera(img_dir_1, board_1.aruco_dict, board_1.board)
-  camera_2 = Camera(img_dir_2, board_2.aruco_dict, board_2.board)
-  camera_1.initFrame()
-  camera_2.initFrame()
-  camera_1.initCalibration()
-  camera_2.initCalibration()
-
-  # 스테레오 캘리브레이션 실행
-  non_overlap_calib = NonOverlapCalib(camera_1, camera_2)
-  non_overlap_calib.run()
+    self.R, self.T = gts.Proj2RT(pose_c1_c2)
+    print("Non-overlapping calibration complete")
+    self.save(f"{project_root}/calibration/results/non_overlap.yaml", \
+        self.camera_1.camera_matrix, self.camera_1.distortion, \
+        self.camera_2.camera_matrix, self.camera_2.distortion, \
+        self.R, self.T)
